@@ -22,6 +22,14 @@ namespace FAWorld
         mAnimTimeMap[AnimState::idle] = 10;
         mAnimTimeMap[AnimState::dead] = 10;
         mAnimTimeMap[AnimState::hit] = 10;
+        
+        boost::format fmt(mAnimPath); 
+        mWalkAnim = FARender::Renderer::get()->loadImage((fmt % 'w').str());
+        mIdleAnim = FARender::Renderer::get()->loadImage((fmt % 'n').str());
+        mDieAnim =  FARender::Renderer::get()->loadImage((fmt % 'd').str());
+        mHitAnim =  FARender::Renderer::get()->loadImage((fmt % 'h').str());
+
+        mIsEnemy = true;
     }
 
     std::string Monster::getDieWav()
@@ -47,55 +55,9 @@ namespace FAWorld
         }
     }
 
-    void Monster::takeDamage(double amount)
-    {
-        mStats->takeDamage(amount);
-        if (!(mStats->getCurrentHP() <= 0))
-        {
-            Engine::ThreadManager::get()->playSound(getHitWav());
-            if(amount > mStats->getLevel()+3)
-            {
-                setAnimation(AnimState::hit);
-                mAnimPlaying = true;
-            }
-        }
-        else
-            mAnimPlaying = false;
-    }
-
     std::string Monster::getName()
     {
         return mName;
     }
 
-    FARender::FASpriteGroup Monster::getCurrentAnim()
-    {
-        boost::format fmt(mAnimPath);
-        switch(mAnimState)
-        {
-            case AnimState::walk:
-                return FARender::Renderer::get()->loadImage((fmt % 'w').str());
-
-            case AnimState::idle:
-                return FARender::Renderer::get()->loadImage((fmt % 'n').str());
-
-            case AnimState::dead:
-                return FARender::Renderer::get()->loadImage((fmt % 'd').str());
-
-            case AnimState::hit:
-                return FARender::Renderer::get()->loadImage((fmt % 'h').str());
-
-            default:
-                return FARender::Renderer::get()->loadImage((fmt % 'n').str());
-        }
-
-
-
-    }
-
-
-    int32_t Monster::getCurrentHP()
-    {
-        return mStats->getCurrentHP();
-    }
 }

@@ -27,24 +27,19 @@ namespace FAWorld
                     MonsterStats * stats=nullptr);
             std::string getDieWav();
             std::string getHitWav();
-            FARender::FASpriteGroup getCurrentAnim();
-            MonsterStats * mStats;            
-            int32_t getCurrentHP();
-            void takeDamage(double amount);
+
             std::string getName();
             monsterType getType()
             {
                 return mType;
             }
 
-
-
         private:
             std::string mAnimPath;
             std::string mSoundPath;
+
             std::string mName;
             monsterType mType;
-
     };
 }
 

@@ -31,9 +31,13 @@ namespace FAWorld
             Actor(const std::string& walkAnimPath="",
                   const std::string& idleAnimPath="",
                   const Position& pos = Position(0,0),
-                  const std::string& dieAnimPath="");
-            void update(bool noclip);
-            virtual ~Actor() = default;
+                  const std::string& dieAnimPath="",
+                  ActorStats* stats=nullptr);
+
+            void update(bool noclip, size_t ticksPassed);
+            void setStats(ActorStats* stats);
+            virtual ~Actor();
+
             virtual std::string getDieWav(){return "";}
             virtual std::string getHitWav(){return "";}
             virtual void setSpriteClass(std::string className){UNUSED_PARAM(className);}
@@ -45,6 +49,9 @@ namespace FAWorld
             void setIdleAnimation(const std::string path);            
             AnimState::AnimState getAnimState();
 
+            virtual void setLevel(GameLevel* level);
+            GameLevel* getLevel();
+
             virtual bool attack(Actor * enemy)
             {
                 UNUSED_PARAM(enemy);
@@ -55,6 +62,9 @@ namespace FAWorld
             FARender::FASpriteGroup mWalkAnim;
             FARender::FASpriteGroup mIdleAnim;
             FARender::FASpriteGroup mDieAnim;
+            FARender::FASpriteGroup mAttackAnim;
+            FARender::FASpriteGroup mHitAnim;
+        
             size_t mFrame;
             virtual void die();
             std::pair<size_t, size_t> mDestination;
@@ -63,13 +73,17 @@ namespace FAWorld
                 return mDestination;
             }
 
-            bool isDead();            
-            std::map<AnimState::AnimState, size_t> mAnimTimeMap;            
-            virtual size_t getSize();
-            virtual size_t writeTo(ENetPacket *packet, size_t start);
-            virtual size_t readFrom(ENetPacket *packet, size_t start);
+            bool isDead() const;
+            bool isEnemy() const;
+            std::map<AnimState::AnimState, size_t> mAnimTimeMap;
+            ActorStats * mStats=nullptr;
+            virtual size_t getWriteSize();
+            virtual bool writeTo(ENetPacket *packet, size_t& position);
+            virtual bool readFrom(ENetPacket *packet, size_t& position);
 
         protected:
+            GameLevel* mLevel = NULL;
+
             bool mIsDead = false;
             friend class boost::serialization::access;
 
@@ -95,8 +109,11 @@ namespace FAWorld
                 ar & this->mDestination;
             }
 
+            bool canIAttack(Actor * actor);
+
             BOOST_SERIALIZATION_SPLIT_MEMBER()
             AnimState::AnimState mAnimState;
+            bool mIsEnemy;
     };
 }
 

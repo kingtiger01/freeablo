@@ -17,7 +17,7 @@ namespace FAWorld
             bool attack(Player * enemy);
             FARender::FASpriteGroup getCurrentAnim();
             void updateSprite();
-            CharacterStatsBase * mStats=nullptr;
+
             bool mInDungeon = false;
             void setStats(CharacterStatsBase * stats){mStats = stats;}
             void takeDamage(double amount);

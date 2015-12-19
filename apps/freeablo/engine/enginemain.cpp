@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <thread>
-#include <chrono>
+#include <boost/asio.hpp>
 
 #include "../faworld/world.h"
 #include "../falevelgen/levelgen.h"
@@ -11,6 +11,7 @@
 #include "../faaudio/audiomanager.h"
 #include "../faworld/itemmanager.h"
 #include "../faworld/characterstats.h"
+#include "../faworld/playerfactory.h"
 #include "threadmanager.h"
 #include "input.h"
 #include "netmanager.h"
@@ -43,13 +44,18 @@ namespace Engine
         size_t resolutionWidth = settings.get<size_t>("Display","resolutionWidth");
         size_t resolutionHeight = settings.get<size_t>("Display","resolutionHeight");
         bool fullscreen = settings.get<size_t>("Display", "fullscreen");
+        std::string pathEXE = settings.get<std::string>("Game", "PathEXE");
+        if (pathEXE == "")
+        {
+            pathEXE = "Diablo.exe";
+        }
 
         Engine::ThreadManager threadManager;
         FARender::Renderer renderer(resolutionWidth, resolutionHeight, fullscreen);
 
         mInputManager = new EngineInputManager(*this);
 
-        std::thread mainThread(boost::bind(&EngineMain::runGameLoop, this, &variables));
+        std::thread mainThread(boost::bind(&EngineMain::runGameLoop, this, &variables, pathEXE));
 
         threadManager.run();
         renderDone = true;
@@ -57,190 +63,105 @@ namespace Engine
         mainThread.join();
     }
 
-    void EngineMain::runGameLoop(const bpo::variables_map& variables)
+    void EngineMain::runGameLoop(const bpo::variables_map& variables, const std::string& pathEXE)
     {
         FALevelGen::FAsrand(time(NULL));
 
+        FAWorld::Player* player;
         FARender::Renderer& renderer = *FARender::Renderer::get();
-        Engine::ThreadManager& threadManager = *Engine::ThreadManager::get();
-        std::string character = variables["character"].as<std::string>() ;
-        DiabloExe::DiabloExe exe;
+        Engine::ThreadManager& threadManager = *Engine::ThreadManager::get();      
 
+        Settings::Settings settings;
+        if(!settings.loadUserSettings())
+            return;
+
+        std::string characterClass = variables["character"].as<std::string>();
+
+        DiabloExe::DiabloExe exe(pathEXE);
         if (!exe.isLoaded())
         {
             renderer.stop();
             return;
         }
-        FAWorld::ItemManager itemManager;
-        itemManager.loadItems(&exe);
+
+        FAWorld::ItemManager& itemManager = FAWorld::ItemManager::get();
         FAWorld::World world(exe);
+        FAWorld::PlayerFactory playerFactory(exe);
 
-        FAWorld::Player* player = world.getCurrentPlayer();
+
+        bool isServer = variables["mode"].as<std::string>() == "server";
+
+        if(isServer)
+            world.generateLevels();
+
+        itemManager.loadItems(&exe);
+        player = playerFactory.create(characterClass);
+        world.addCurrentPlayer(player);
         world.generateLevels();
-        FAWorld::CharacterStatsBase * stats;
-        DiabloExe::CharacterStats char_stats = exe.getCharacterStat(character);
-
-
-
-        if(character == "Warrior")
-        {            
-            stats = new FAWorld::MeleeStats(char_stats, player);
-            FAWorld::Item item = itemManager.getBaseItem(125);
-
-            player->mInventory.putItem(
-                        item,
-                        FAWorld::Item::eqLEFTHAND,
-                        FAWorld::Item::eqFLOOR,
-                        0, 0, 0, false);
-            item = itemManager.getBaseItem(18);
-            player->mInventory.putItem(
-                        item,
-                        FAWorld::Item::eqRIGHTHAND,
-                        FAWorld::Item::eqFLOOR,
-                        0, 0, 0, false);
-            item = itemManager.getBaseItem(26);
-
-            player->mInventory.putItem(
-                        item,
-                        FAWorld::Item::eqINV,
-                        FAWorld::Item::eqFLOOR,
-                        0, 0, 0, false);
-            item = itemManager.getBaseItem(43);
-            item.setCount(100);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqINV,
-                                       FAWorld::Item::eqFLOOR,
-                                       3, 0, 0, false);
-            item = itemManager.getBaseItem(79);
-
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 0, false);
-
-            item = itemManager.getBaseItem(79);
-
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 1, false);
-            player->setSpriteClass("warrior");
-            player->setIdleAnimation("plrgfx/warrior/wld/wldst.cl2");
-            player->setWalkAnimation("plrgfx/warrior/wld/wldwl.cl2");
-
-        }
-
-        else if(character == "Rogue")
-        {
-            stats = new FAWorld::RangerStats(char_stats, player);
-            FAWorld::Item item = itemManager.getBaseItem(121);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqLEFTHAND,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 0, false);
-            item = itemManager.getBaseItem(43);
-            item.setCount(100);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqINV,
-                                       FAWorld::Item::eqFLOOR,
-                                       3, 0, 0,false);
-            item = itemManager.getBaseItem(79);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 0, false);
-            item = itemManager.getBaseItem(79);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 1, false);
-            player->setSpriteClass("rogue");
-            player->setIdleAnimation("plrgfx/rogue/rlb/rlbst.cl2");
-            player->setWalkAnimation("plrgfx/rogue/rlb/rlbwl.cl2");
-
-        }
-        else
-        {
-            stats = new FAWorld::MageStats(char_stats, player);
-            FAWorld::Item item = itemManager.getBaseItem(124);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqLEFTHAND,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 0, false);
-            item = itemManager.getBaseItem(43);
-            item.setCount(100);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqINV,
-                                       FAWorld::Item::eqFLOOR,
-                                       3, 0, 0, false);
-            item = itemManager.getBaseItem(81);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqFLOOR,
-                                       0, 0, 0, false);
-            item = itemManager.getBaseItem(81);
-            player->mInventory.putItem(item,
-                                       FAWorld::Item::eqBELT,
-                                       FAWorld::Item::eqBELT,
-                                       0, 0, 1, false);
-            player->setSpriteClass("sorceror");
-            player->setIdleAnimation("plrgfx/sorceror/slt/sltst.cl2");
-            player->setWalkAnimation("plrgfx/sorceror/slt/sltwl.cl2");
-        }
-
-
-        world.setStatsObject(stats);
-        player->mInventory.collectEffects();
-        stats->recalculateDerivedStats();
-
 
         int32_t currentLevel = variables["level"].as<int32_t>();
 
-
-        FAGui::GuiManager guiManager(player->mInventory, *this, character);
+        FAGui::GuiManager guiManager(player->mInventory, *this, characterClass);
 
         // -1 represents the main menu
-        if(currentLevel != -1)
+        if(currentLevel != -1 && isServer)
         {
             world.setLevel(currentLevel);
-            Level::Level& level = *world.getCurrentLevel();            
+
+            FAWorld::GameLevel& level = *world.getCurrentLevel();
+
             player->mPos = FAWorld::Position(level.upStairsPos().first, level.upStairsPos().second);
             guiManager.showIngameGui();
         }
         else
         {
             pause();
-            guiManager.showMainMenu();
-            threadManager.playMusic("music/dintro.wav");
+            bool showTitleScreen = settings.get<bool>("Game", "showTitleScreen");
+            if(showTitleScreen)
+            {
+                guiManager.showTitleScreen();
+            }
+            else
+            {
+                guiManager.showMainMenu();
+                threadManager.playMusic("music/dintro.wav");
+            }
         }
 
-        auto last = std::chrono::system_clock::now();
-
-        bool isServer = variables["mode"].as<std::string>() == "server";
+        boost::asio::io_service io;
+        auto startTime = std::chrono::system_clock::now();
 
         NetManager netManager(isServer);
 
         // Main game logic loop
         while(!mDone)
         {
-            auto now = std::chrono::system_clock::now();
+            boost::asio::deadline_timer timer(io, boost::posix_time::milliseconds(1000/FAWorld::World::ticksPerSecond));
 
-            while(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch() - last.time_since_epoch()).count() < (int64_t)(1000/FAWorld::World::ticksPerSecond))
+            mInputManager->update(mPaused);
+            if(!mPaused)
             {
-                std::this_thread::yield();
-                now = std::chrono::system_clock::now();
+                world.update(mNoclip);
+            }
+            else
+            {
+                static const int WAIT_TIME = 7000;
+
+                if(guiManager.currentGuiType() == FAGui::GuiManager::TitleScreen)
+                {
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch() - startTime.time_since_epoch()).count();
+                    if(duration > WAIT_TIME)
+                    {
+                        guiManager.showMainMenu();
+                        threadManager.playMusic("music/dintro.wav");
+                    }
+                }
             }
 
-
-            last = now;
-
-            mInputManager->update(mPaused);            
-            if(!mPaused)
-                world.update(mNoclip);
             netManager.update();
             guiManager.updateGui();
 
-            Level::Level* level = world.getCurrentLevel();
+            FAWorld::GameLevel* level = world.getCurrentLevel();
             FARender::RenderState* state = renderer.getFreeState();
             if(state)
             {
@@ -263,6 +184,13 @@ namespace Engine
 
             }
             renderer.setCurrentState(state);
+
+            long remainingTickTime = timer.expires_from_now().total_milliseconds();
+
+            if(remainingTickTime < 0)
+                std::cerr << "tick time exceeded by " << -remainingTickTime << "ms" << std::endl;
+
+            timer.wait();
         }
 
         renderer.stop();

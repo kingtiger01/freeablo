@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <boost/python.hpp>
+#include <misc/boost_python.h>
 
 namespace FAWorld
 {
@@ -27,6 +27,7 @@ namespace FAGui
             {}
 
         protected:
+            void showMainMenu();
             void quitGame();
             void pauseGame();
             void unpauseGame();
