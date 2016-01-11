@@ -21,6 +21,15 @@ int main(int argc, char** argv)
     FAIO::init();
 
     FAIO::FAFile* file = FAIO::FAfopen(argv[1]);
+
+    if(!file)
+    {
+        std::cerr << argv[1] << " not found" << std::endl;
+        return 2;
+    }
+
+    std::cout << "extracting " << argv[1] << std::endl;
+
     FILE* output = fopen(argv[2], "w");
 
     int read = 1;
